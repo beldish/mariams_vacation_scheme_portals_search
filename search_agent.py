@@ -12,6 +12,7 @@ import sys
 import html
 import json
 import os
+import subprocess
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -24,12 +25,35 @@ class VacationSchemeSearchAgent:
     def __init__(self, config_file='config.ini', sent_urls_file='sent_urls.json'):
         """Initialize the agent with configuration."""
         self.config = configparser.ConfigParser()
-        self.config.read(config_file)
+        self.use_env_vars = not os.path.exists(config_file)
+        
+        if self.use_env_vars:
+            print(f"[{datetime.now()}] Config file not found, using environment variables")
+            self._load_config_from_env()
+        else:
+            self.config.read(config_file)
+        
         self.sent_urls_file = sent_urls_file
         self.sent_urls = self._load_sent_urls()
         
         # Validate required configuration
         self._validate_config()
+    
+    def _load_config_from_env(self):
+        """Load configuration from environment variables."""
+        # Create config sections
+        self.config.add_section('serpapi')
+        self.config.add_section('email')
+        self.config.add_section('search')
+        
+        # Load from environment variables
+        self.config.set('serpapi', 'api_key', os.getenv('SERPAPI_KEY', ''))
+        self.config.set('email', 'sender_email', os.getenv('SENDER_EMAIL', ''))
+        self.config.set('email', 'sender_password', os.getenv('SENDER_PASSWORD', ''))
+        self.config.set('email', 'recipient_email', os.getenv('RECIPIENT_EMAIL', ''))
+        self.config.set('email', 'smtp_server', os.getenv('SMTP_SERVER', ''))
+        self.config.set('email', 'smtp_port', os.getenv('SMTP_PORT', '587'))
+        self.config.set('search', 'query', os.getenv('SEARCH_QUERY', ''))
     
     def _load_sent_urls(self):
         """Load previously sent URLs from file."""
@@ -48,6 +72,51 @@ class VacationSchemeSearchAgent:
                 json.dump(list(self.sent_urls), f, indent=2)
         except IOError as e:
             print(f"[{datetime.now()}] Warning: Could not save sent URLs: {e}", file=sys.stderr)
+    
+    def _commit_sent_urls(self):
+        """Commit and push sent URLs file to git repository."""
+        try:
+            # Check if there are changes to commit
+            result = subprocess.run(
+                ['git', 'diff', '--quiet', self.sent_urls_file],
+                cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+                capture_output=True
+            )
+            
+            # If exit code is 1, there are changes
+            if result.returncode == 1:
+                print(f"[{datetime.now()}] Committing {self.sent_urls_file} to git...")
+                
+                # Add the file
+                subprocess.run(
+                    ['git', 'add', self.sent_urls_file],
+                    cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+                    check=True
+                )
+                
+                # Commit the file
+                commit_msg = f"Update sent URLs - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                subprocess.run(
+                    ['git', 'commit', '-m', commit_msg],
+                    cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+                    check=True
+                )
+                
+                # Push to remote
+                subprocess.run(
+                    ['git', 'push'],
+                    cwd=os.path.dirname(os.path.abspath(__file__)) or '.',
+                    check=True
+                )
+                
+                print(f"[{datetime.now()}] Successfully pushed {self.sent_urls_file} to repository")
+            else:
+                print(f"[{datetime.now()}] No changes to commit for {self.sent_urls_file}")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"[{datetime.now()}] Warning: Could not commit to git: {e}", file=sys.stderr)
+        except Exception as e:
+            print(f"[{datetime.now()}] Warning: Git operation failed: {e}", file=sys.stderr)
     
     def _validate_config(self):
         """Validate that all required configuration is present."""
@@ -221,6 +290,9 @@ class VacationSchemeSearchAgent:
             # Save the updated list of sent URLs
             self._save_sent_urls()
             print(f"[{datetime.now()}] Saved {len(self.sent_urls)} sent URLs")
+            
+            # Commit and push to git repository
+            self._commit_sent_urls()
             
             print(f"[{datetime.now()}] Agent completed successfully")
             return True
