@@ -9,7 +9,6 @@ import schedule
 import time
 import configparser
 from datetime import datetime
-import pytz
 from search_agent import VacationSchemeSearchAgent
 
 
@@ -47,21 +46,20 @@ def main():
     print(f"Schedule: Every {schedule_day.title()} at {schedule_time} {timezone_str}")
     print(f"{'='*60}\n")
     
-    # Schedule the job
-    if schedule_day == 'monday':
-        schedule.every().monday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'tuesday':
-        schedule.every().tuesday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'wednesday':
-        schedule.every().wednesday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'thursday':
-        schedule.every().thursday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'friday':
-        schedule.every().friday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'saturday':
-        schedule.every().saturday.at(schedule_time).do(run_search_job)
-    elif schedule_day == 'sunday':
-        schedule.every().sunday.at(schedule_time).do(run_search_job)
+    # Schedule the job using dictionary mapping
+    day_mapping = {
+        'monday': schedule.every().monday,
+        'tuesday': schedule.every().tuesday,
+        'wednesday': schedule.every().wednesday,
+        'thursday': schedule.every().thursday,
+        'friday': schedule.every().friday,
+        'saturday': schedule.every().saturday,
+        'sunday': schedule.every().sunday
+    }
+    
+    scheduler_obj = day_mapping.get(schedule_day)
+    if scheduler_obj:
+        scheduler_obj.at(schedule_time).do(run_search_job)
     else:
         print(f"Invalid schedule day: {schedule_day}. Defaulting to Monday.")
         schedule.every().monday.at(schedule_time).do(run_search_job)
