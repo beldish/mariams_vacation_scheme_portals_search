@@ -9,6 +9,9 @@ and sends the results via email. It's designed to run on a schedule.
 import configparser
 import smtplib
 import sys
+import html
+import json
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -18,13 +21,33 @@ from serpapi import GoogleSearch
 class VacationSchemeSearchAgent:
     """Agent for searching vacation scheme opportunities and sending results via email."""
     
-    def __init__(self, config_file='config.ini'):
+    def __init__(self, config_file='config.ini', sent_urls_file='sent_urls.json'):
         """Initialize the agent with configuration."""
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
+        self.sent_urls_file = sent_urls_file
+        self.sent_urls = self._load_sent_urls()
         
         # Validate required configuration
         self._validate_config()
+    
+    def _load_sent_urls(self):
+        """Load previously sent URLs from file."""
+        if os.path.exists(self.sent_urls_file):
+            try:
+                with open(self.sent_urls_file, 'r') as f:
+                    return set(json.load(f))
+            except (json.JSONDecodeError, IOError):
+                return set()
+        return set()
+    
+    def _save_sent_urls(self):
+        """Save sent URLs to file."""
+        try:
+            with open(self.sent_urls_file, 'w') as f:
+                json.dump(list(self.sent_urls), f, indent=2)
+        except IOError as e:
+            print(f"[{datetime.now()}] Warning: Could not save sent URLs: {e}", file=sys.stderr)
     
     def _validate_config(self):
         """Validate that all required configuration is present."""
@@ -77,20 +100,20 @@ class VacationSchemeSearchAgent:
         <html>
         <head>
             <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #2c3e50; }
-                h2 { color: #34495e; margin-top: 20px; }
-                .result { 
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
+                h1 {{ color: #2c3e50; }}
+                h2 {{ color: #34495e; margin-top: 20px; }}
+                .result {{ 
                     border: 1px solid #ddd; 
                     padding: 15px; 
                     margin: 10px 0; 
                     border-radius: 5px;
                     background-color: #f9f9f9;
-                }
-                .title { font-weight: bold; color: #2980b9; font-size: 16px; }
-                .link { color: #27ae60; word-break: break-all; }
-                .snippet { color: #555; margin-top: 5px; }
-                .footer { margin-top: 30px; color: #7f8c8d; font-size: 12px; }
+                }}
+                .title {{ font-weight: bold; color: #2980b9; font-size: 16px; }}
+                .link {{ color: #27ae60; word-break: break-all; }}
+                .snippet {{ color: #555; margin-top: 5px; }}
+                .footer {{ margin-top: 30px; color: #7f8c8d; font-size: 12px; }}
             </style>
         </head>
         <body>
@@ -103,21 +126,29 @@ class VacationSchemeSearchAgent:
             date=datetime.now().strftime('%B %d, %Y at %H:%M %Z')
         )
         
-        # Add organic results
+        # Add organic results (filter out already sent URLs)
         if 'organic_results' in results and results['organic_results']:
-            html_body += "<h2>Search Results</h2>"
-            for idx, result in enumerate(results['organic_results'], 1):
-                title = result.get('title', 'No title')
-                link = result.get('link', '#')
-                snippet = result.get('snippet', 'No description available')
-                
-                html_body += f"""
-                <div class="result">
-                    <div class="title">{idx}. {title}</div>
-                    <div class="link"><a href="{link}">{link}</a></div>
-                    <div class="snippet">{snippet}</div>
-                </div>
-                """
+            new_results = [r for r in results['organic_results'] if r.get('link') not in self.sent_urls]
+            
+            if new_results:
+                html_body += "<h2>New Search Results</h2>"
+                for idx, result in enumerate(new_results, 1):
+                    title = html.escape(result.get('title', 'No title'))
+                    link = html.escape(result.get('link', '#'))
+                    snippet = html.escape(result.get('snippet', 'No description available'))
+                    
+                    html_body += f"""
+                    <div class="result">
+                        <div class="title">{idx}. {title}</div>
+                        <div class="link"><a href="{link}">{link}</a></div>
+                        <div class="snippet">{snippet}</div>
+                    </div>
+                    """
+                    
+                    # Track this URL as sent
+                    self.sent_urls.add(result.get('link'))
+            else:
+                html_body += "<p>No new results found. All results have been sent previously.</p>"
         else:
             html_body += "<p>No results found for this search query.</p>"
         
@@ -186,6 +217,10 @@ class VacationSchemeSearchAgent:
             # Send email
             subject = f"Vacation Scheme Search Results - {datetime.now().strftime('%B %d, %Y')}"
             self.send_email(subject, html_body)
+            
+            # Save the updated list of sent URLs
+            self._save_sent_urls()
+            print(f"[{datetime.now()}] Saved {len(self.sent_urls)} sent URLs")
             
             print(f"[{datetime.now()}] Agent completed successfully")
             return True
