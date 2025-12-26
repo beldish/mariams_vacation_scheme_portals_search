@@ -77,20 +77,20 @@ class VacationSchemeSearchAgent:
         <html>
         <head>
             <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #2c3e50; }
-                h2 { color: #34495e; margin-top: 20px; }
-                .result { 
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
+                h1 {{ color: #2c3e50; }}
+                h2 {{ color: #34495e; margin-top: 20px; }}
+                .result {{ 
                     border: 1px solid #ddd; 
                     padding: 15px; 
                     margin: 10px 0; 
                     border-radius: 5px;
                     background-color: #f9f9f9;
-                }
-                .title { font-weight: bold; color: #2980b9; font-size: 16px; }
-                .link { color: #27ae60; word-break: break-all; }
-                .snippet { color: #555; margin-top: 5px; }
-                .footer { margin-top: 30px; color: #7f8c8d; font-size: 12px; }
+                }}
+                .title {{ font-weight: bold; color: #2980b9; font-size: 16px; }}
+                .link {{ color: #27ae60; word-break: break-all; }}
+                .snippet {{ color: #555; margin-top: 5px; }}
+                .footer {{ margin-top: 30px; color: #7f8c8d; font-size: 12px; }}
             </style>
         </head>
         <body>
