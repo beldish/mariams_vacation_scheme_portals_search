@@ -1,0 +1,14 @@
+[Unit]
+Description=Vacation Scheme Search Agent Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/mariams_vacation_scheme_portals_search
+ExecStart=/usr/bin/python3 /path/to/mariams_vacation_scheme_portals_search/scheduler.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
